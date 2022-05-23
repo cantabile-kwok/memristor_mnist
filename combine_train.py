@@ -120,7 +120,7 @@ if __name__ == '__main__':
                 fake_loss_input = interpolated_preds.detach() + cnn_preds - cnn_preds.detach()
                 # ===================================================
 
-                loss = nn.NLLLoss()(torch.log(fake_loss_input), target)  # NOTE: take log at first
+                loss = nn.NLLLoss()(torch.log(fake_loss_input), target.to(device))  # NOTE: take log at first
 
                 # loss = criterion(output, target.to(device))
                 loss.backward()

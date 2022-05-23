@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="WebServers">
+    <option name="servers">
+      <webServer id="273250cf-60e9-4c1d-92b4-0d2edac35672" name="memtorch">
+        <fileTransfer rootFolder="/Default/debug/cu01_debug/cu01/code/memtorch" accessType="SFTP" host="hpc.ai-research.cn" port="5232" sshConfigId="af43b969-462e-48d2-acca-0dde1a5f7272" sshConfig="ywg12@hpc.ai-research.cn:5232 password">
+          <advancedOptions>
+            <advancedOptions dataProtectionLevel="Private" passiveMode="true" shareSSLContext="true" />
+          </advancedOptions>
+        </fileTransfer>
+      </webServer>
+    </option>
+  </component>
+</project>

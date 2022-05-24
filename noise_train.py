@@ -38,7 +38,7 @@ def mem_from_cnn(cnn_model):
                                 mapping_routine=naive_map,
                                 transistor=True,  # true -> 1T1R
                                 programming_routine=None,
-                                tile_shape=(128, 16),  # size of the crossbar
+                                tile_shape=(128, 128),  # size of the crossbar
                                 max_input_voltage=0.3,
                                 scaling_routine=naive_scale,
                                 ADC_resolution=8,
@@ -46,6 +46,18 @@ def mem_from_cnn(cnn_model):
                                 quant_method='linear')
     patched_model.tune_()
     return patched_model
+def add_noise_to_weights( model,device,std=0.5,mean=0):
+    """
+    with torch.no_grad():
+        if hasattr(m, 'weight'):
+            m.weight.add_(torch.randn(m.weight.size()) * 0.1)
+    """
+    model = copy.deepcopy(model)
+    gassian_kernel = torch.distributions.Normal(mean, std)
+    with torch.no_grad():
+        for param in model.parameters():
+            param.mul_((torch.exp(gassian_kernel.sample(param.size())).to(device)))
+    return model
 
 
 class LinearScheduledSampler:
@@ -85,14 +97,16 @@ if __name__ == '__main__':
     update_step_cnt = 0
 
     # ============= memristor related ===========
-    patched_model = mem_from_cnn(cnn_model)
+    #patched_model = mem_from_cnn(cnn_model)
+    patched_model = add_noise_to_weights(cnn_model,device)
     # ========================================
 
     # ================ Train =================
     scheduled_sampler = LinearScheduledSampler(args.mem_steps, start_value=1, stop_value=.3)
     alpha = 1.
-
+   
     for epoch in range(args.epoch):
+        print(args.epoch)
         print('Epoch: [%d]\t\t' % (epoch + 1), end='')
         if epoch % args.lr_step == 0:
             learning_rate = learning_rate * 0.1
@@ -102,11 +116,11 @@ if __name__ == '__main__':
         cnn_model.train()
         pbar = tqdm(enumerate(train_loader), total=len(train_loader))
         for batch_idx, (data, target) in pbar:
-            if (update_step_cnt % args.mem_steps == 0) and (update_step_cnt != 0):  # NOTE: don't update at 0-step
-                patched_model = mem_from_cnn(cnn_model)
-
+            # if (update_step_cnt % args.mem_steps == 0) and (update_step_cnt != 0):  # NOTE: don't update at 0-step
+            #     patched_model = mem_from_cnn(cnn_model)
+            patched_model = add_noise_to_weights(cnn_model,device)
             alpha = scheduled_sampler.get_prob()
-            #print(alpha)
+            # print(alpha)
 
             optimizer.zero_grad()
             cnn_logits = cnn_model(data.to(device))
@@ -129,10 +143,12 @@ if __name__ == '__main__':
             update_step_cnt += 1
             scheduled_sampler.update()
             pbar.set_postfix(alpha=alpha, batch_loss=loss.item())
-
+            
+        
+        patched_model = add_noise_to_weights(cnn_model, device)
         accuracy = test_acc(patched_model, test_loader)
-        print('%2.2f%%' % accuracy)
         accuracy2 = test_acc(cnn_model, test_loader)
+        print('%2.2f%%' % accuracy)
         print('%2.2f%%' % accuracy2)
         if accuracy > best_accuracy:
             torch.save(cnn_model.state_dict(), 'trained_model.pt')

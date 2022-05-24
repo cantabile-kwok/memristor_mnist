@@ -1,22 +1,25 @@
 import torch
 import torch.nn as nn
-
+import numpy as np
 import memtorch
 from memtorch.utils import LoadMNIST
-
+import os
 import copy
 from memtorch.mn.Module import patch_model
 from memtorch.map.Input import naive_scale
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 from memtorch.map.Parameter import naive_map
-
+os.environ["CUDA_VISIBLE_DEVICES"]="1"
 from memtorch.bh.nonideality.NonIdeality import apply_nonidealities
 from models import CNN
 import torch.optim as optim
+import logging
+
 import argparse
 
-
+torch.manual_seed(0)
+np.random.seed(0)
 def test_acc(model, loader):
     correct = 0
     model.eval()
@@ -26,7 +29,12 @@ def test_acc(model, loader):
         correct += pred.eq(target.to(device).data.view_as(pred)).cpu().sum()
     return 100. * float(correct) / float(len(loader.dataset))
 
-
+def test_noise_model(model,loader,std):
+    acc = 0
+    for i in range(10):
+        patched_model = add_noise_to_weights(model, device, std)
+        acc += test_acc(patched_model,loader)
+    return acc/10.0
 def mem_from_cnn(cnn_model):
     reference_memristor = memtorch.bh.memristor.VTEAM
     reference_memristor_params = {'time_series_resolution': 1e-10}
@@ -83,22 +91,25 @@ if __name__ == '__main__':
     parser.add_argument('--lr-step', default=5, type=int, help='every this number of epochs, multiply lr by sth')
     parser.add_argument('--lr-coef', default=0.1, type=float, help='every time to multiply lr by when reaching lr_step')
     parser.add_argument('--mem-steps', default=234, type=int, help='interval of steps when we update memristor')
+    parser.add_argument('--sch',default=False,type=bool,help = 'use schedule sampling')
+    parser.add_argument('--save', default='train_noise2', type=str, help='save_path')
+    parser.add_argument('--std', default=0.5, type=float, help='gauss std')
     args = parser.parse_args()
-
+    logging.basicConfig(filename=args.save+'.log', level=logging.DEBUG)
     batch_size = args.bsz
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     train_loader, validation_loader, test_loader = LoadMNIST(batch_size=batch_size, validation=False, num_workers=0)
     cnn_model = CNN().to(device)
     optimizer = optim.Adam(cnn_model.parameters(), lr=args.lr)
     best_accuracy = 0
-
+    logging.info(args)
     learning_rate = args.lr
 
     update_step_cnt = 0
 
     # ============= memristor related ===========
     #patched_model = mem_from_cnn(cnn_model)
-    patched_model = add_noise_to_weights(cnn_model,device)
+    patched_model = add_noise_to_weights(cnn_model,device,args.std)
     # ========================================
 
     # ================ Train =================
@@ -118,8 +129,9 @@ if __name__ == '__main__':
         for batch_idx, (data, target) in pbar:
             # if (update_step_cnt % args.mem_steps == 0) and (update_step_cnt != 0):  # NOTE: don't update at 0-step
             #     patched_model = mem_from_cnn(cnn_model)
-            patched_model = add_noise_to_weights(cnn_model,device)
-            alpha = scheduled_sampler.get_prob()
+            patched_model = add_noise_to_weights(cnn_model,device,args.std)
+            if args.sch:
+                alpha = scheduled_sampler.get_prob()
             # print(alpha)
 
             optimizer.zero_grad()
@@ -145,11 +157,14 @@ if __name__ == '__main__':
             pbar.set_postfix(alpha=alpha, batch_loss=loss.item())
             
         
-        patched_model = add_noise_to_weights(cnn_model, device)
-        accuracy = test_acc(patched_model, test_loader)
+        patched_model = add_noise_to_weights(cnn_model,device,args.std)
+        accuracy = test_noise_model(cnn_model, test_loader,args.std)
         accuracy2 = test_acc(cnn_model, test_loader)
+        logging.info('acc1 %2.2f%%' % accuracy)
+        logging.info('acc2 %2.2f%%' % accuracy2)
         print('%2.2f%%' % accuracy)
         print('%2.2f%%' % accuracy2)
+
         if accuracy > best_accuracy:
-            torch.save(cnn_model.state_dict(), 'trained_model.pt')
+            torch.save(cnn_model.state_dict(), args.save+'.pt')
             best_accuracy = accuracy

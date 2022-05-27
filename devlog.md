@@ -22,3 +22,7 @@
 Acc: 99.06
 
 ![lenet](figs/module_acc.png)
+
+## MLP layers
+
+![layers](figs/layers_vs_acc.png)

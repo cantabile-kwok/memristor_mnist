@@ -9,3 +9,16 @@
 ## batch size
 
 固定std=1.2，model=MLP or CNN，lr=0.001。
+![bsz](figs/bsz_acc.png)
+
+## Learning rate
+
+固定std=1.2，model=MLP or CNN, bsz=16
+![lr](figs/lr_acc.png)
+在lr比较大的时候训崩了，红线本身已经很烂了
+
+## LeNet module
+
+Acc: 99.06
+
+![lenet](figs/module_acc.png)

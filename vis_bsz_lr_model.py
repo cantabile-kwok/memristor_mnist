@@ -23,7 +23,7 @@ plt.title('Batch size vs. Acc (lr=0.001, std=1.2)')
 for i, bsz in enumerate([8, 16, 32, 64, 128, 256, 512]):
     exp_dir = f"[b]{bsz}-[lr]0.001-[m]MLP"
     acc = clean_acc[exp_dir]
-    xs = np.arange(i-0.4, i, 0.01)
+    xs = np.arange(i - 0.4, i, 0.01)
     if i == 0:
         plt.plot(xs, [acc] * len(xs), color='red', label='clean Acc', linestyle='-.')
     else:
@@ -31,7 +31,7 @@ for i, bsz in enumerate([8, 16, 32, 64, 128, 256, 512]):
     exp_dir = f"[b]{bsz}-[lr]0.001-[m]CNN"
 
     acc = clean_acc[exp_dir]
-    xs = np.arange(i, i+0.4, 0.01)
+    xs = np.arange(i, i + 0.4, 0.01)
     plt.plot(xs, [acc] * len(xs), color='red', linestyle='-.')
 
 plt.yticks(np.arange(-3, 105, 5))

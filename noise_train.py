@@ -12,7 +12,7 @@ from tqdm import tqdm
 from memtorch.map.Parameter import naive_map
 os.environ["CUDA_VISIBLE_DEVICES"]="1"
 from memtorch.bh.nonideality.NonIdeality import apply_nonidealities
-from models import CNN
+from models import *
 import torch.optim as optim
 import logging
 
@@ -87,13 +87,13 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-b', "--bsz", default=256, type=int, help='batch size')
     parser.add_argument("-e", "--epoch", default=10, type=int, help='epoch num')
-    parser.add_argument('-l', '--lr', default=0.1, type=float, help='learning rate initial value')
+    parser.add_argument('-l', '--lr', default=0.001, type=float, help='learning rate initial value')
     parser.add_argument('--lr-step', default=5, type=int, help='every this number of epochs, multiply lr by sth')
     parser.add_argument('--lr-coef', default=0.1, type=float, help='every time to multiply lr by when reaching lr_step')
     parser.add_argument('--mem-steps', default=234, type=int, help='interval of steps when we update memristor')
     parser.add_argument('--sch',default=False,type=bool,help = 'use schedule sampling')
-    parser.add_argument('--save', default='train_noise2', type=str, help='save_path')
-    parser.add_argument('--std', default=0.5, type=float, help='gauss std')
+    parser.add_argument('--save', default='train_noise_std1_lr001_repeat', type=str, help='save_path')
+    parser.add_argument('--std', default=1, type=float, help='gauss std')
     args = parser.parse_args()
     logging.basicConfig(filename=args.save+'.log', level=logging.DEBUG)
     batch_size = args.bsz
@@ -155,15 +155,22 @@ if __name__ == '__main__':
             update_step_cnt += 1
             scheduled_sampler.update()
             pbar.set_postfix(alpha=alpha, batch_loss=loss.item())
-            
+            # if batch_idx % 20 == 0:
+            #     accuracy = test_noise_model(cnn_model, test_loader, args.std)
+            #     print("acc",accuracy)
+            #
         
-        patched_model = add_noise_to_weights(cnn_model,device,args.std)
+        #patched_model = add_noise_to_weights(cnn_model,device,args.std)
+        repeat_model = CNN_decision(cnn_model).to(device)
         accuracy = test_noise_model(cnn_model, test_loader,args.std)
         accuracy2 = test_acc(cnn_model, test_loader)
+        accuracy3 = test_noise_model(repeat_model, test_loader,args.std)
         logging.info('acc1 %2.2f%%' % accuracy)
         logging.info('acc2 %2.2f%%' % accuracy2)
+        logging.info('acc3 %2.2f%%' % accuracy3)
         print('%2.2f%%' % accuracy)
         print('%2.2f%%' % accuracy2)
+        print('%2.2f%%' % accuracy3)
 
         if accuracy > best_accuracy:
             torch.save(cnn_model.state_dict(), args.save+'.pt')

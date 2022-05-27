@@ -2,7 +2,7 @@ import memtorch
 import torch
 from memtorch.utils import LoadMNIST
 import os
-os.environ["CUDA_VISIBLE_DEVICES"]="0"
+os.environ["CUDA_VISIBLE_DEVICES"]="7"
 import copy
 from memtorch.mn.Module import patch_model
 import torch.nn as nn
@@ -48,32 +48,20 @@ memristor = reference_memristor(**reference_memristor_params)
 
 device = torch.device('cpu' if not torch.cuda.is_available() else 'cuda')
 #device = torch.device('cpu')
-# model = Net().to(device)
+#model = Net().to(device)
 model = XzrCNN()
-# model.load_state_dict(torch.load('trained_model.pt', map_location=device), strict=False)
-model.load_state_dict(torch.load('xzr_baseline.pt', map_location='cpu'), strict=False)
 model.to(device)
+#model.load_state_dict(torch.load('train_schcombine_model.pt', map_location=device), strict=False)
+model.load_state_dict(torch.load('xzr_baseline.pt', map_location=device), strict=False)
+
 
 s = time.time()
-patched_model = patch_model(copy.deepcopy(model),
-                            memristor_model=reference_memristor,
-                            memristor_model_params=reference_memristor_params,
-                            module_parameters_to_patch=[torch.nn.Linear, torch.nn.Conv2d],
-                            mapping_routine=naive_map,
-                            transistor=True,  # true -> 1T1R
-                            programming_routine=None,
-                            tile_shape=(128, 16),  # size of the crossbar
-                            max_input_voltage=0.3,
-                            scaling_routine=naive_scale,
-                            ADC_resolution=8,
-                            ADC_overflow_rate=0.,
-                            quant_method='linear',
-                            verbose=True)
+
 t = time.time()
 print(f"Patched model takes {t-s} seconds")
 print("Begins to tune")
 s = time.time()
-patched_model.tune_()
+
 t = time.time()
 print(f"Tune takes {t-s} seconds")
 def test(model, test_loader):
@@ -126,11 +114,26 @@ data = torch.randn(size=(1, 1, 28, 28))
 print('=' * 20)
 
 batch_size = 32
-train_loader, validation_loader, test_loader = LoadMNIST(batch_size=batch_size, validation=False)
+train_loader, validation_loader, test_loader = LoadMNIST(batch_size=batch_size, validation=True)
 
 with torch.no_grad():
     print(test(model, test_loader))
-    print(test(patched_model, test_loader))
+    patched_model = patch_model(copy.deepcopy(model),
+                                memristor_model=reference_memristor,
+                                memristor_model_params=reference_memristor_params,
+                                module_parameters_to_patch=[torch.nn.Linear, torch.nn.Conv2d],
+                                mapping_routine=naive_map,
+                                transistor=True,  # true -> 1T1R
+                                programming_routine=None,
+                                tile_shape=(64, 64),  # size of the crossbar
+                                max_input_voltage=0.3,
+                                scaling_routine=naive_scale,
+                                ADC_resolution=8,
+                                ADC_overflow_rate=0.,
+                                quant_method='linear',
+                                verbose=True)
+    patched_model.tune_()
+    print(test(patched_model, validation_loader))
 
 # for img, label in test_loader:
 #     plt.plot(nn.Softmax(dim=-1)(model(img)).squeeze().detach().numpy(), label="model", marker='o', markersize=5,
